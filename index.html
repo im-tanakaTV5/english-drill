@@ -493,6 +493,7 @@ function renderQ() {
     const inp = `<input id="ans" aria-label="空欄に入る語" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">`;
     body = u.d === "vocab"
       ? `<p class="en">${enHtml(q.en, inp)}</p>
+      <p class="gloss">${esc(q.ja)}</p>
       <p class="hint">ヒント：<b>${esc(q.hint)}</b></p>`
       : `<p class="en">${enHtml(q.en, inp)}<span class="base">（${esc(q.hint)}）</span></p>
       <p class="gloss">${esc(q.ja)}</p>`;
