@@ -173,6 +173,10 @@ details.point p{margin-top:6px;font-size:14px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pos-adv{color:#c9a3f0;background:#2b2036}}
 :root[data-theme="dark"] .pos-adv{color:#c9a3f0;background:#2b2036}
 .how div:last-child:nth-child(odd){grid-column:1/-1}
+
+/* 完了までの目安 */
+.progress{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.progress b{font-size:16px}
 body{margin:0}
 </style>
 </head>
@@ -384,6 +388,47 @@ function syncLine() {
   if (pa) return `<p class="saved ng">未送信の記録が ${pa}回分あります。通信できしだい送ります。</p>`;
   return "";
 }
+/* 完了までの目安：「完了」＝すべての問題を最初の1回ずつ解き終えること（復習は別）。
+   ペースは、直近14日（始めてから14日未満ならその日数）に初めて解いた問題の数の1日平均 */
+const DAYMS = 86400000;
+const dayNum = ds => { const [y, m, d] = ds.split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAYMS); };
+function progressInfo(mode) {
+  const units = DATA.filter(u => u.d === mode);
+  const total = units.reduce((a, u) => a + u.qs.length, 0);
+  const ids = new Set(units.flatMap(u => u.qs.map(q => q.id)));
+  const firsts = Object.values(SRS.map).filter(x => ids.has(x.id) && x.first).map(x => x.first).sort();
+  const learned = firsts.length, t = today();
+  if (!learned) return {total, learned: 0};
+  const span = dayNum(t) - dayNum(firsts[0]) + 1, win = Math.min(14, span);
+  const winStart = addDays(t, -(win - 1));
+  const rate = firsts.filter(f => f >= winStart).length / win;
+  const info = {total, learned, win, span, rate};
+  if (learned >= total) return Object.assign(info, {done: true});
+  if (rate > 0) { info.days = Math.ceil((total - learned) / rate); info.eta = addDays(t, info.days); }
+  return info;
+}
+function progressPanel() {
+  if (SRS.state === "loading") return "";
+  const mode = MODE, i = progressInfo(mode), u = mode === "vocab" ? "語" : "問";
+  let head, body = "";
+  if (!i.learned) {
+    head = "完了までの目安";
+    body = `まだ解いていません。${mode === "vocab" ? "20語のまとまり" : "単元"}を1つ解くと、そのペースから完了の目安を出します。`;
+  } else if (i.done) {
+    head = `全${i.total}${u}を一巡しました`;
+    body = "最初の1回ずつは解き終えています。あとは復習で定着させます。";
+  } else if (!i.eta) {
+    head = "完了までの目安";
+    body = `解いた ${i.learned} / ${i.total}${u}。直近${i.win}日は新しく解いていないので、目安を出せません。`;
+  } else {
+    head = `一巡まで あと約 ${i.days}日（${md(i.eta)}ごろ）`;
+    const rate = i.rate >= 10 ? Math.round(i.rate) : Math.round(i.rate * 10) / 10;
+    body = `解いた ${i.learned} / ${i.total}${u}（${Math.floor(i.learned / i.total * 100)}%）・直近${i.win}日のペース：1日 ${rate}${u}`;
+  }
+  const note = i.learned && !i.done ? `<p class="saved">「完了」は、すべて最初の1回ずつ解き終えることです（復習は別）。${i.span < 3 ? "始めたばかりなので、日がたつと目安の精度が上がります。" : ""}</p>` : "";
+  return `<section class="progress"><div style="display:grid;gap:4px"><b>${esc(head)}</b>${body ? `<p class="saved">${esc(body)}</p>` : ""}${note}</div></section>`;
+}
+
 function reviewPanel() {
   if (SRS.state === "loading") return `<p class="saved">復習の予定を読み込んでいます…</p>`;
   const due = dueList(MODE), all = Object.values(SRS.map).filter(x => QBY[x.id] && QBY[x.id].u.d === MODE);
@@ -467,6 +512,7 @@ function home() {
       <p class="lead">${esc(I.lead)}</p>
     </div>
     <section class="review" id="review">${reviewPanel()}</section>
+    ${progressPanel()}
     <div class="how">${I.how.map(([b, t]) => `<div><b>${esc(b)}</b><span>${esc(t)}</span></div>`).join("")}</div>
     <nav class="units">${units.map((u, i) => {
       const done = u.qs.filter(q => SRS.map[q.id]).length;
