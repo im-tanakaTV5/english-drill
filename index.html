@@ -582,7 +582,8 @@ function syncLine() {
 const DAYMS = 86400000;
 const dayNum = ds => { const [y, m, d] = ds.split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAYMS); };
 function progressInfo(mode) {
-  const units = DATA.filter(u => u.d === mode);
+  // 文法のセットB・Cは、Aの問題を覚えてしまったとき用の予備なので、一巡の数え方には入れない
+  const units = DATA.filter(u => u.d === mode && (mode !== "grammar" || u.set === "A"));
   const total = units.reduce((a, u) => a + u.qs.length, 0);
   const ids = new Set(units.flatMap(u => u.qs.map(q => q.id)));
   const firsts = Object.values(SRS.map).filter(x => ids.has(x.id) && x.first).map(x => x.first).sort();
@@ -642,7 +643,7 @@ const INTRO = {
     note: "600番の語は、スクショが届きしだい足します。"},
   grammar: {eyebrow: "TOEIC L&R に向けた中学文法", h1: "中学文法",
     lead: "TOEIC Part 5 と同じ形式です。空欄に入る語句を、似た4つの選択肢（A〜D）から1つ選びます。1問20秒の目安で、選んだ時点で答え合わせをします。日本語訳と理由は答えたあとに出ます。1単元に問題の違うセットが3つ（A・B・C）あり、1セット16問です。",
-    how: [["4択で選ぶ", "空欄に合う語句を選ぶ。A〜Dのキーでも選べる"], ["分からないとき", "「分からない」を押すと答えと理由が出る。間違いと同じ扱いで、翌日の復習に回る（Eキーでも押せる）"], ["答えのあと", "正解の理由と日本語訳が出る。間違えた問題は翌日の復習に回る"], ["セット", "同じ単元で別の問題を解ける。1つ解き終えたら、次のセットで確かめ直す"]],
+    how: [["4択で選ぶ", "空欄に合う語句を選ぶ。A〜Dのキーでも選べる"], ["分からないとき", "「分からない」を押すと答えと理由が出る。間違いと同じ扱いで、翌日の復習に回る（Eキーでも押せる）"], ["答えのあと", "正解の理由と日本語訳が出る。間違えた問題は翌日の復習に回る"], ["セット", "ふだんはセットA。Aの問題を覚えてしまったら、B・Cで同じ単元を別の問題で確かめ直す（一巡までの日数はAだけで数える）"]],
     note: "14「品詞」は、TOEIC Part 5 でいちばん多く出る型です。15「動詞の形 総まとめ」には、1〜13で出た形がまざっています。"}
 };
 function syncBox() {
