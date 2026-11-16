@@ -205,10 +205,17 @@ details.point p{margin-top:6px;font-size:14px}
 .unit.grp:hover{background:transparent}
 .unit.grp .sets{grid-column:2;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:6px}
 .setlink{display:grid;gap:0;justify-items:start;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--sheet);color:var(--ink);text-decoration:none}
-.setlink b{font-size:14px}
+.setlink b{font-size:14px;white-space:nowrap}
+@media (max-width:380px){.setlink{padding:6px 6px}.setlink b{font-size:13px}}
 .setlink span{font-size:12px;color:var(--muted)}
 .setlink:hover{border-color:var(--mark);background:var(--mark-soft)}
 .setlink.has{border-color:var(--ok)}
+.unit.grp.now{border-left:3px solid var(--mark);padding-left:1px;background:var(--mark-soft)}
+.unit.grp.now:hover{background:var(--mark-soft)}
+.tag.nowtag{border-color:var(--mark);color:var(--mark);font-weight:700;margin-left:6px;vertical-align:2px}
+.revbody{display:grid;gap:4px;flex:1 1 220px;min-width:0}
+.posline{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
+.posline .btn{font-size:14px;padding:6px 12px}
 body{margin:0}
 </style>
 </head>
@@ -234,7 +241,9 @@ const NUM = ["zero","one","two","three","four","five","six","seven","eight","nin
 const BLANK = "-------";
 const pad = n => String(n).padStart(2, "0");
 const localDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const today = () => localDate(new Date());
+// 夜中に解いても前の日の続きとして扱いたいので、日付は朝4時で切り替える
+const DAY_START_H = 4;
+const today = () => localDate(new Date(Date.now() - DAY_START_H * 3600000));
 function addDays(ds, n) { const [y, m, d] = ds.split("-").map(Number); return localDate(new Date(y, m - 1, d + n)); }
 const md = ds => `${+ds.slice(5, 7)}/${+ds.slice(8, 10)}`;
 const QBY = {};
@@ -558,13 +567,31 @@ function unitNo(u) {
   if (u.d === "grammar") return pad(GBASE.indexOf(u.base) + 1) + (u.set === "A" ? "" : u.set);
   return pad(DATA.filter(x => x.d === u.d).indexOf(u) + 1);
 }
+// いまどの単元か：セットAを最後まで解いた単元の数と、まだ解き終えていない最初の単元
+function gramPos() {
+  const a = DATA.filter(u => u.d === "grammar" && u.set === "A");
+  const solved = u => u.qs.filter(q => SRS.map[q.id]).length;
+  const doneN = a.filter(u => solved(u) === u.qs.length).length;
+  const next = a.find(u => solved(u) < u.qs.length);
+  return {total: a.length, doneN, next, nextSolved: next ? solved(next) : 0};
+}
+function gramPosLine() {
+  if (SRS.state === "loading" || MODE !== "grammar") return "";
+  const p = gramPos();
+  if (!p.next) return `<p class="saved">単元：全${p.total}単元のセットAを解き終えています。</p>`;
+  const no = unitNo(p.next);
+  return `<div class="posline"><span class="saved">単元：${p.doneN} / ${p.total} 単元おわり</span>
+    <a class="btn" href="#${p.next.id}" style="text-decoration:none">${p.nextSolved ? "続き" : "次"}は ${no}「${esc(p.next.title)}」</a></div>`;
+}
 function grammarNav(units) {
+  const nextBase = SRS.state === "loading" ? null : (gramPos().next || {}).base;
   const groups = [];
   units.forEach(u => { let g = groups[groups.length - 1]; if (!g || g.base !== u.base) { g = {base: u.base, list: []}; groups.push(g); } g.list.push(u); });
   return groups.map((g, i) => { const a = g.list[0];
-    return `<div class="unit grp">
+    const now = g.base === nextBase;
+    return `<div class="unit grp${now ? " now" : ""}"${now ? ` id="now"` : ""}>
         <span class="no">${pad(i + 1)}</span>
-        <span class="t">${esc(a.title)}</span>
+        <span class="t">${esc(a.title)}${now ? ` <span class="tag nowtag">次はここ</span>` : ""}</span>
         <span class="p">${esc(a.point.split("。")[0])}。</span>
         <span class="sets">${g.list.map(u => { const done = u.qs.filter(q => SRS.map[q.id]).length;
           return `<a class="setlink${done ? " has" : ""}" href="#${u.id}"><b>セット${u.set}</b><span>${done ? `解いた ${done}/${u.qs.length}` : `${u.qs.length}問`}</span></a>`; }).join("")}</span>
@@ -616,7 +643,7 @@ function progressPanel() {
     body = `解いた ${i.learned} / ${i.total}${u}（${Math.floor(i.learned / i.total * 100)}%）・直近${i.win}日のペース：1日 ${rate}${u}`;
   }
   const note = i.learned && !i.done ? `<p class="saved">「完了」は、すべて最初の1回ずつ解き終えることです（復習は別）。${i.span < 3 ? "始めたばかりなので、日がたつと目安の精度が上がります。" : ""}</p>` : "";
-  return `<section class="progress"><div style="display:grid;gap:4px"><b>${esc(head)}</b>${body ? `<p class="saved">${esc(body)}</p>` : ""}${note}</div></section>`;
+  return `<section class="progress"><div style="display:grid;gap:4px"><b>${esc(head)}</b>${body ? `<p class="saved">${esc(body)}</p>` : ""}${note}${gramPosLine()}</div></section>`;
 }
 
 function reviewPanel() {
@@ -624,16 +651,21 @@ function reviewPanel() {
   const due = dueList(MODE), all = Object.values(SRS.map).filter(x => QBY[x.id] && QBY[x.id].u.d === MODE);
   const what = MODE === "vocab" ? "20語のまとまりを1つ" : "単元を1つ";
   if (!all.length) return `<div style="display:grid;gap:4px"><b>今日の復習はまだありません</b><p class="saved">${what}解くと、解いた問題が翌日から復習に回ります。</p>${syncLine()}</div>`;
+  const t = today();
+  const doneN = all.filter(x => x.last === t && x.hist && x.hist.length && x.hist[x.hist.length - 1].k === "review").length;
   if (!due.length) {
     const nextDay = all.map(x => x.due).sort()[0];
     const nextN = all.filter(x => x.due === nextDay).length;
-    return `<div style="display:grid;gap:4px"><b>今日の復習は終わっています</b><p class="saved">次の復習は ${md(nextDay)} に ${nextN}問です。</p>${syncLine()}</div>`;
+    return `<div style="display:grid;gap:4px"><b>${doneN ? `今日の復習はおしまいです（${doneN}問）` : "今日の復習はありません"}</b><p class="saved">次の復習は ${md(nextDay)} に ${nextN}問です。</p>${syncLine()}</div>`;
   }
   const byUnit = {};
-  due.forEach(x => { const t = QBY[x.id].u.title; byUnit[t] = (byUnit[t] || 0) + 1; });
-  return `<div style="display:grid;gap:4px"><b>今日の復習 ${due.length}問</b>
+  due.forEach(x => { const u = QBY[x.id].u.title; byUnit[u] = (byUnit[u] || 0) + 1; });
+  const sum = doneN + due.length, n = Math.min(BATCH, due.length);
+  return `<div class="revbody">
+      <b>今日の復習 あと${due.length}問</b>
+      ${doneN ? `<div class="track"><i style="width:${doneN / sum * 100}%"></i></div><p class="saved">${doneN} / ${sum}問 おわり。0問になったら今日はおしまいです。</p>` : `<p class="saved">0問になったら今日はおしまいです。</p>`}
       <p class="saved">${Object.entries(byUnit).map(([k, v]) => `${esc(k)} ${v}`).join("・")}</p>${syncLine()}</div>
-    <a class="btn primary" href="#review" style="text-decoration:none">${due.length > BATCH ? `${BATCH}問ずつ始める` : "復習を始める"}</a>`;
+    <a class="btn primary" href="#review" style="text-decoration:none">${due.length > n ? `${n}問解く（残り${due.length}問）` : `残り${due.length}問を解く`}</a>`;
 }
 
 const INTRO = {
@@ -717,7 +749,7 @@ function home() {
       </a>`; }).join("")}
     </nav>
     <div class="lead" style="font-size:13px;display:grid;gap:6px">
-      <p>復習のしくみ：解いた問題は、正解するたびに 1日後 → 3日後 → 7日後 → 14日後 → 30日後 → 60日後 と間隔をあけて出てきます。復習で間違えた問題は、翌日からやり直しです。同じ日に何度解いても、予定が動くのはその日の最初の1回だけです。単語と文法の予定は別々です。</p>
+      <p>復習のしくみ：解いた問題は、正解するたびに 1日後 → 3日後 → 7日後 → 14日後 → 30日後 → 60日後 と間隔をあけて出てきます。復習で間違えた問題は、翌日からやり直しです。同じ日に何度解いても、予定が動くのはその日の最初の1回だけです。日付は朝4時で切り替わるので、夜中に解いた分は前の日の続きです。単語と文法の予定は別々です。</p>
       <p>${esc(I.note)}結果と復習の記録は自動で保存され、TOEIC対策部門が日付つきで読めます。</p>
     </div>
     ${syncBox()}`;
@@ -998,7 +1030,7 @@ function result() {
       <div class="eyebrow">${esc(S.lv)}${S.unit ? ` · ${no}` : ""}</div>
       <h1 style="font-size:26px">${esc(S.title)}</h1>
     </div>
-    <div class="score"><span class="big">${okN} / ${list.length}</span><span style="color:var(--muted)">${isRev ? `覚えていた ${okN}問・忘れていた ${wrong.length}問です。忘れていた問題は明日もう一度出ます。` : wrong.length ? `間違えた問題は ${wrong.length}問です。` : "全問正解です。"}</span></div>
+    <div class="score"><span class="big">${okN} / ${list.length}</span><span style="color:var(--muted)">${isRev ? `覚えていた ${okN}問・忘れていた ${wrong.length}問です。忘れていた問題は明日もう一度出ます。${remain ? `今日の復習はあと${remain}問です。` : "今日の復習はこれでおしまいです。"}` : wrong.length ? `間違えた問題は ${wrong.length}問です。` : "全問正解です。"}</span></div>
     <div class="split">${Object.keys(KIND).filter(t => byKind[t]).map(t => `<div><b>${kindName(t, S.drill)}</b><span>${byKind[t][0]} / ${byKind[t][1]}</span></div>`).join("")}
       ${avg !== null ? `<div><b>本番形式の平均</b><span>${avg}秒</span></div>` : ""}</div>
     <p class="saved" id="saved">結果を保存しています…</p>
