@@ -235,6 +235,8 @@ details.point p{margin-top:6px;font-size:14px}
 .wm{font-weight:500}
 .role{font-family:var(--f-num);font-weight:700;font-size:13px;min-width:24px;text-align:center;border-radius:4px;padding:0 6px;color:var(--sheet)}
 .r-S{background:var(--mark)}.r-V{background:var(--ng)}.r-O{background:var(--ok)}.r-C{background:var(--warn)}.r-M{background:var(--muted)}
+.jaafter{font-size:15px;color:var(--ink);background:var(--paper);border-left:3px solid var(--line);padding:6px 10px;margin-top:-6px}
+.winfo[hidden]{display:none}
 body{margin:0}
 </style>
 </head>
@@ -1105,6 +1107,11 @@ function check(gaveUp, pick) {
   S.res[S.pos] = {ok, given: gaveUp ? "" : g, self: false, secs, counted, prev};
   S.phase = "checked";
   const fb = document.getElementById("fb");
+  // 答えたら、正解でも間違いでも問題文のすぐ下に訳を出す
+  if (q.t === "choice" && q.ja) {
+    const en = document.querySelector("#card .en");
+    if (en) en.insertAdjacentHTML("afterend", `<p class="jaafter">${esc(q.ja)}</p>`);
+  }
   const others = q.t === "choice" ? [] : q.a.slice(1);
   const nextLine = counted ? `<span class="alt">次の復習：${md(SRS.map[q.id].due)}</span>` : "";
   fb.innerHTML = `<div class="fb ${ok ? "ok" : "ng"}">
@@ -1112,7 +1119,7 @@ function check(gaveUp, pick) {
       ${!ok && q.t !== "choice" ? `<span class="ans">${esc(q.a[0])}</span>` : ""}
       ${others.length && q.t === "write" ? `<span class="alt">ほかの正解：${others.map(esc).join(" ／ ")}</span>` : ""}
       ${!ok && q.t === "form" && others.length ? `<span class="alt">${others.map(esc).join("・")} でも正解</span>` : ""}
-      ${q.t === "choice" ? `<span class="alt">${g === SKIP ? `答え：(${"ABCD"[S.perm.indexOf(q.ans)]}) ${esc(q.ch[q.ans])}　` : ""}訳：${esc(q.ja)}</span>` : ""}
+      ${q.t === "choice" && g === SKIP ? `<span class="alt">答え：(${"ABCD"[S.perm.indexOf(q.ans)]}) ${esc(q.ch[q.ans])}</span>` : ""}
       <span class="ex">${esc(q.ex)}</span>
       <span id="nextdue">${nextLine}</span>
       ${!ok && !gaveUp && q.t === "write" ? `<button class="btn self" id="self">書き方が違うだけで合っていた</button>` : ""}
@@ -1129,7 +1136,7 @@ function check(gaveUp, pick) {
     self.replaceWith(Object.assign(document.createElement("span"), {className: "alt", textContent: "正解に直しました"}));
   };
   const last = S.pos === S.list.length - 1;
-  document.getElementById("acts").innerHTML = `<button class="btn primary" id="next">${last ? "結果を見る" : "次へ"}</button><span class="spacer"></span><span class="kbd">Enterで次へ</span>`;
+  document.getElementById("acts").innerHTML = `<span class="kbd">Enterで次へ</span><span class="spacer"></span><button class="btn primary" id="next">${last ? "結果を見る" : "次へ"}</button>`;
   const nx = document.getElementById("next");
   nx.onclick = next;
   try { nx.focus({preventScroll: true}); } catch (e) {}
